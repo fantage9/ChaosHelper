@@ -33,14 +33,15 @@ namespace WindowsFormsApp1
             MessageBox.Show(result.Item2);
             */
 
-            string json = getJSON(poesessid);
-            
-            if(json.Length==0)
+            try
+            {
+                return getJSON(poesessid);
+            }
+            catch (Exception e)
             {
                 Button2_Click(null, null);
-                return "";
+                throw e;
             }
-            return json;
         }
 
         public string getJSON(string POECookie)
@@ -52,28 +53,35 @@ namespace WindowsFormsApp1
             textBox1.Text = textBox1.Text.Replace(" ", "");
             textBox2.Text = textBox2.Text.Replace(" ", "");
             textBox3.Text = textBox3.Text.Replace(" ", "");
-            string accountName = textBox1.Text.Replace(" ", "");
+            string accountName = System.Web.HttpUtility.UrlEncode(textBox1.Text);
+
             string tabidx = textBox2.Text.Replace(" ", "");
-            string league = comboBox1.SelectedItem.ToString().Replace(" ", "");
+            string league = textBox4.Text.Replace(" ", "");
             string url = "https://www.pathofexile.com/character-window/get-stash-items?league=" + league + "&tabs=0&tabIndex=" + tabidx + "&accountName=" + accountName;
+
+            Trace.WriteLine(" ### url : " + url);
             
             try
             {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
                 request.CookieContainer = cookies;
+                Trace.WriteLine(" ### request.RequestUri : " + request.RequestUri);
 
                 WebResponse response = request.GetResponse();
 
                 using(Stream responseStream = response.GetResponseStream())
                 {
                     StreamReader reader = new StreamReader(responseStream, Encoding.UTF8);
-                    return reader.ReadToEnd();
+                    string resultString = reader.ReadToEnd();
+                    Trace.WriteLine(" ### Response : " + resultString);
+                    return resultString;
                 }
             }
-            catch
+            catch (Exception e)
             {
-                MessageBox.Show("계정을 불러오는데 문제가 있습니다. Somthing wrong with load account");
-                return "";
+                Trace.WriteLine(" ### ERROR : " + e);
+                MessageBox.Show("계정을 불러오는데 문제가 있습니다. Somthing wrong with load account.\n" + e);
+                throw e;
             }
         }
 
@@ -149,7 +157,9 @@ namespace WindowsFormsApp1
 
         int stash;
         int loaded;
-        bool[] arr = new bool[576];
+        
+
+        int currentIndex = 0;
 
         Form2 f2;
         Form3 f3;
@@ -166,11 +176,13 @@ namespace WindowsFormsApp1
             RegisterHotKey((int)this.Handle, 4, 0x2, (int)Keys.F7);
             RegisterHotKey((int)this.Handle, 5, 0x2, (int)Keys.F8);
 
+            RegisterHotKey((int)this.Handle, 6, 0x2, (int)Keys.F6);
+
             InitializeComponent();
             f2 = new Form2(this);
             f3 = new Form3(this);
-            timer1.Enabled = false;
-            timer1.Interval = 5000; //5000ms
+            //timer1.Enabled = false;
+            //timer1.Interval = 5000; //5000ms
 
             //f3.BackColor = f3.TransparencyKey;
             f3.TopMost = true;
@@ -182,7 +194,7 @@ namespace WindowsFormsApp1
             SetLayeredWindowAttributes(f3.Handle, 0, (Byte)value, LWA_ALPHA);
 
             stash = 2;
-            comboBox1.SelectedIndex = 0;
+            textBox4.Text = "metamorph";
 
             comboBox2.SelectedIndex = 2;
             comboBox3.SelectedIndex = 2;
@@ -190,6 +202,7 @@ namespace WindowsFormsApp1
             comboBox5.SelectedIndex = 2;
             comboBox6.SelectedIndex = 2;
             comboBox7.SelectedIndex = 2;
+            comboBox1.SelectedIndex = 2;
 
             comboBox8.SelectedIndex = 8;
             comboBox9.SelectedIndex = 9;
@@ -197,6 +210,7 @@ namespace WindowsFormsApp1
             comboBox11.SelectedIndex = 11;
             comboBox12.SelectedIndex = 6;
             comboBox13.SelectedIndex = 7;
+            comboBox14.SelectedIndex = 5;
 
             Items.y_W1 = new List<Item>();
             Items.y_W2 = new List<Item>();
@@ -231,8 +245,8 @@ namespace WindowsFormsApp1
                 textBox1.Text = lines[0];
                 textBox2.Text = lines[1];
                 textBox3.Text = lines[2];
+                textBox4.Text = lines[3];
 
-                comboBox1.SelectedIndex = Convert.ToInt32(lines[3]);
                 comboBox2.SelectedIndex = Convert.ToInt32(lines[4]);
                 comboBox3.SelectedIndex = Convert.ToInt32(lines[5]);
                 comboBox4.SelectedIndex = Convert.ToInt32(lines[6]);
@@ -265,6 +279,11 @@ namespace WindowsFormsApp1
                 checkBox1.Checked = Convert.ToBoolean(lines[22]);
                 label1.Text = "(" + left + ", " + top + ")";
                 label2.Text = "(" + right + ", " + bottom + ")";
+
+                if (lines.Length > 23)
+                    comboBox1.SelectedIndex = Convert.ToInt32(lines[23]);
+                if (lines.Length > 24)
+                    comboBox14.SelectedIndex = Convert.ToInt32(lines[24]);
             }
         }
 
@@ -276,6 +295,7 @@ namespace WindowsFormsApp1
             UnregisterHotKey((int)this.Handle, 3);
             UnregisterHotKey((int)this.Handle, 4);
             UnregisterHotKey((int)this.Handle, 5);
+            UnregisterHotKey((int)this.Handle, 6);
         }
 
         // 윈도우프로시저 콜백함수
@@ -300,56 +320,11 @@ namespace WindowsFormsApp1
                     MessageBox.Show("Stash R/B position set\n창고 우하단 좌표가 지정되었습니다.");
                 }
 
-                if (m.WParam == (IntPtr)0x2) // 그 키의 ID가 1이면
+                if (m.WParam == (IntPtr)0x6) // 그 키의 ID가 6이면 - 새로운 Map 작성
                 {
-                    if (loaded==1)
+                    if (loaded == 1)
                     {
-                        f2.Controls.Clear();
-                        f2.Show();
-                        Rectangle r = new Rectangle(left, top, right - left, bottom - top);
-
-                        f2.Bounds = r;
-                        f2.TopMost = true;
-                        f2.Location = new Point(left, top);
-
-                        arr = new bool[576];
-                        if(f3.chaos > 0)
-                        {
-                            bool did = false;
-                            did = pop_weapon(did);
-                            did = pop_amulet(did);
-                            did = pop_belt(did);
-                            did = pop_boots(did);
-                            did = pop_chest(did);
-                            did = pop_gloves(did);
-                            did = pop_helmet(did);
-                            did = pop_ring(did);
-                            did = pop_ring(did);
-                            f3.chaos = f3.chaos - 2;
-
-                            /*f3.ChangeValues(
-                            Items.y_W1.Count * 2 +
-                            Items.y_W2.Count,
-                            Items.y_helmet.Count,
-                            Items.y_chest.Count,
-                            Items.y_boots.Count,
-                            Items.y_gloves.Count,
-                            Items.y_amulet.Count,
-                            Items.y_ring.Count,
-                            Items.y_belt.Count,
-                            Items.n_W1.Count * 2 +
-                            Items.n_W2.Count,
-                            Items.n_helmet.Count,
-                            Items.n_chest.Count,
-                            Items.n_boots.Count,
-                            Items.n_gloves.Count,
-                            Items.n_amulet.Count,
-                            Items.n_ring.Count,
-                            Items.n_belt.Count
-                            );*/
-                        }
-                        f2.Form2_draw(r, arr, stash);
-                        f2.Show();
+                        ResetItemSet();
                     }
                     else
                     {
@@ -357,18 +332,26 @@ namespace WindowsFormsApp1
                     }
                 }
 
-                if (m.WParam == (IntPtr)0x3) // 그 키의 ID가 1이면
+                if (m.WParam == (IntPtr)0x2) // 그 키의 ID가 2이면 - 다음 세트 보여주기
                 {
-                        f2.Hide();
+                    if (loaded == 1)
+                    {
+                        ShowItemSet(true);
+                    }
                 }
 
-                if (m.WParam == (IntPtr)0x4) // 그 키의 ID가 1이면
+                if (m.WParam == (IntPtr)0x3) // 그 키의 ID가 3이면
+                {
+                    f2.Hide();
+                }
+
+                if (m.WParam == (IntPtr)0x4) // 그 키의 ID가 4이면
                 {
                     //MessageBox.Show("Bank On Test");
                     f3.Show();
                 }
 
-                if (m.WParam == (IntPtr)0x5) // 그 키의 ID가 1이면
+                if (m.WParam == (IntPtr)0x5) // 그 키의 ID가 5이면
                 {
                     //MessageBox.Show("Bank Off Test");
                     f3.Hide();
@@ -377,13 +360,57 @@ namespace WindowsFormsApp1
             base.WndProc(ref m);
         }
 
-        public bool pop_weapon(bool did)
+        bool ResetItemSet()
+        {
+            try
+            {
+                LoadItems();
+
+                Items.itemSetList.Clear();
+
+                Trace.WriteLine("f3.chaos : " + f3.chaos);
+
+                for (int i = 0; i < f3.chaos; i++)
+                {
+                    List<Item> newItemSet = new List<Item>();
+                    bool did = false;
+                    did = PopWeapon(did, newItemSet);
+                    did = PopItem(did, Items.n_amulet, Items.y_amulet, newItemSet);
+                    did = PopItem(did, Items.n_belt, Items.y_belt, newItemSet);
+                    did = PopItem(did, Items.n_boots, Items.y_boots, newItemSet);
+                    did = PopItem(did, Items.n_chest, Items.y_chest, newItemSet);
+                    did = PopItem(did, Items.n_gloves, Items.y_gloves, newItemSet);
+                    did = PopItem(did, Items.n_helmet, Items.y_helmet, newItemSet);
+                    did = PopItem(did, Items.n_ring, Items.y_ring, newItemSet);
+                    did = PopItem(did, Items.n_ring, Items.y_ring, newItemSet);
+                
+                    Items.itemSetList.Add(newItemSet);
+                }
+
+                Trace.WriteLine("Item Set Count : " + Items.itemSetList.Count());
+
+                currentIndex = Items.itemSetList.Count() - 1;
+
+                ShowItemSet(false);
+
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                Trace.WriteLine(" ##ResetItemSet ERROR : " + e);
+
+                return false;
+            }
+        }
+
+        public bool PopWeapon(bool did, List<Item> itemSet)
         {
             int x = 0;
             int y = 0;
             int w = 0;
             int h = 0;
-            if(did)
+            if (did)
             {
                 if (Items.n_W2.Count > 0)
                 {
@@ -412,7 +439,8 @@ namespace WindowsFormsApp1
                         Items.y_W1.RemoveAt(0);
                     }
 
-                    make_hole(x, y, w, h);
+                    itemSet.Add(new Item(x, y, w, h));
+
                     if (Items.n_W1.Count > 0)
                     {
                         x = Items.n_W1.First().get_x();
@@ -470,7 +498,8 @@ namespace WindowsFormsApp1
                         Items.n_W1.RemoveAt(0);
                     }
 
-                    make_hole(x, y, w, h);
+                    itemSet.Add(new Item(x, y, w, h));
+
                     if (did)
                     {
                         if (Items.n_W1.Count > 0)
@@ -521,11 +550,13 @@ namespace WindowsFormsApp1
                     Items.n_W2.RemoveAt(0);
                 }
             }
-            make_hole(x, y, w, h);
+
+            itemSet.Add(new Item(x, y, w, h));
+
             return did;
         }
-        
-        public bool pop_amulet(bool did)
+
+        public bool PopItem(bool did, List<Item> itemsN, List<Item> itemY, List<Item> itemSet)
         {
             int x = 0;
             int y = 0;
@@ -533,342 +564,103 @@ namespace WindowsFormsApp1
             int h = 0;
             if (did)
             {
-                if (Items.n_amulet.Count > 0)
+                if (itemsN.Count > 0)
                 {
-                    x = Items.n_amulet.First().get_x();
-                    y = Items.n_amulet.First().get_y();
-                    w = Items.n_amulet.First().get_w();
-                    h = Items.n_amulet.First().get_h();
-                    Items.n_amulet.RemoveAt(0);
+                    x = itemsN.First().get_x();
+                    y = itemsN.First().get_y();
+                    w = itemsN.First().get_w();
+                    h = itemsN.First().get_h();
+                    itemsN.RemoveAt(0);
                 }
-                else if (Items.y_amulet.Count > 0)
+                else if (itemY.Count > 0)
                 {
-                    x = Items.y_amulet.First().get_x();
-                    y = Items.y_amulet.First().get_y();
-                    w = Items.y_amulet.First().get_w();
-                    h = Items.y_amulet.First().get_h();
-                    Items.y_amulet.RemoveAt(0);
+                    x = itemY.First().get_x();
+                    y = itemY.First().get_y();
+                    w = itemY.First().get_w();
+                    h = itemY.First().get_h();
+                    itemY.RemoveAt(0);
                 }
             }
             else
             {
-                if (Items.y_amulet.Count > 0)
+                if (itemY.Count > 0)
                 {
-                    x = Items.y_amulet.First().get_x();
-                    y = Items.y_amulet.First().get_y();
-                    w = Items.y_amulet.First().get_w();
-                    h = Items.y_amulet.First().get_h();
-                    Items.y_amulet.RemoveAt(0);
+                    x = itemY.First().get_x();
+                    y = itemY.First().get_y();
+                    w = itemY.First().get_w();
+                    h = itemY.First().get_h();
+                    itemY.RemoveAt(0);
                     did = true;
                 }
                 else if (Items.n_amulet.Count > 0)
                 {
-                    x = Items.n_amulet.First().get_x();
-                    y = Items.n_amulet.First().get_y();
-                    w = Items.n_amulet.First().get_w();
-                    h = Items.n_amulet.First().get_h();
-                    Items.n_amulet.RemoveAt(0);
+                    x = itemsN.First().get_x();
+                    y = itemsN.First().get_y();
+                    w = itemsN.First().get_w();
+                    h = itemsN.First().get_h();
+                    itemsN.RemoveAt(0);
                 }
             }
-            make_hole(x, y, w, h);
-            return did;
-        }
-               
-        public bool pop_belt(bool did)
-        {
-            int x = 0;
-            int y = 0;
-            int w = 0;
-            int h = 0;
-            if (did)
-            {
-                if (Items.n_belt.Count > 0)
-                {
-                    x = Items.n_belt.First().get_x();
-                    y = Items.n_belt.First().get_y();
-                    w = Items.n_belt.First().get_w();
-                    h = Items.n_belt.First().get_h();
-                    Items.n_belt.RemoveAt(0);
-                }
-                else if (Items.y_belt.Count > 0)
-                {
-                    x = Items.y_belt.First().get_x();
-                    y = Items.y_belt.First().get_y();
-                    w = Items.y_belt.First().get_w();
-                    h = Items.y_belt.First().get_h();
-                    Items.y_belt.RemoveAt(0);
-                }
-            }
-            else
-            {
-                if (Items.y_belt.Count > 0)
-                {
-                    x = Items.y_belt.First().get_x();
-                    y = Items.y_belt.First().get_y();
-                    w = Items.y_belt.First().get_w();
-                    h = Items.y_belt.First().get_h();
-                    Items.y_belt.RemoveAt(0);
-                    did = true;
-                }
-                else if (Items.n_belt.Count > 0)
-                {
-                    x = Items.n_belt.First().get_x();
-                    y = Items.n_belt.First().get_y();
-                    w = Items.n_belt.First().get_w();
-                    h = Items.n_belt.First().get_h();
-                    Items.n_belt.RemoveAt(0);
-                }
-            }
-            make_hole(x, y, w, h);
-            return did;
-        }
-               
-        public bool pop_boots(bool did)
-        {
-            int x = 0;
-            int y = 0;
-            int w = 0;
-            int h = 0;
-            if (did)
-            {
-                if (Items.n_boots.Count > 0)
-                {
-                    x = Items.n_boots.First().get_x();
-                    y = Items.n_boots.First().get_y();
-                    w = Items.n_boots.First().get_w();
-                    h = Items.n_boots.First().get_h();
-                    Items.n_boots.RemoveAt(0);
-                }
-                else if (Items.y_boots.Count > 0)
-                {
-                    x = Items.y_boots.First().get_x();
-                    y = Items.y_boots.First().get_y();
-                    w = Items.y_boots.First().get_w();
-                    h = Items.y_boots.First().get_h();
-                    Items.y_boots.RemoveAt(0);
-                }
-            }
-            else
-            {
-                if (Items.y_boots.Count > 0)
-                {
-                    x = Items.y_boots.First().get_x();
-                    y = Items.y_boots.First().get_y();
-                    w = Items.y_boots.First().get_w();
-                    h = Items.y_boots.First().get_h();
-                    Items.y_boots.RemoveAt(0);
-                    did = true;
-                }
-                else if (Items.n_boots.Count > 0)
-                {
-                    x = Items.n_boots.First().get_x();
-                    y = Items.n_boots.First().get_y();
-                    w = Items.n_boots.First().get_w();
-                    h = Items.n_boots.First().get_h();
-                    Items.n_boots.RemoveAt(0);
-                }
-            }
-            make_hole(x, y, w, h);
+
+            itemSet.Add(new Item(x, y, w, h));
+
             return did;
         }
 
-        public bool pop_chest(bool did)
+        void ShowItemSet(bool next)
         {
-            int x = 0;
-            int y = 0;
-            int w = 0;
-            int h = 0;
-            if (did)
+            f2.Controls.Clear();
+            f2.Show();
+            if (Items.itemSetList.Count() > 0)
             {
-                if (Items.n_chest.Count > 0)
+                if (next)
                 {
-                    x = Items.n_chest.First().get_x();
-                    y = Items.n_chest.First().get_y();
-                    w = Items.n_chest.First().get_w();
-                    h = Items.n_chest.First().get_h();
-                    Items.n_chest.RemoveAt(0);
+                    currentIndex++;
                 }
-                else if (Items.y_chest.Count > 0)
+                
+                if (currentIndex >= Items.itemSetList.Count())
                 {
-                    x = Items.y_chest.First().get_x();
-                    y = Items.y_chest.First().get_y();
-                    w = Items.y_chest.First().get_w();
-                    h = Items.y_chest.First().get_h();
-                    Items.y_chest.RemoveAt(0);
+                    currentIndex = 0;
                 }
-            }
-            else
+
+                Trace.WriteLine("currentIndex : " + currentIndex);
+
+                List<Item> showingItemSet = Items.itemSetList[currentIndex];
+                Trace.WriteLine("showingItemSet  Count : " + showingItemSet.Count());
+
+                bool[] arr = new bool[576];
+
+                Rectangle r = new Rectangle(left, top, right - left, bottom - top);
+
+                f2.Bounds = r;
+                f2.TopMost = true;
+                f2.Location = new Point(left, top);
+
+                foreach (Item item in showingItemSet)
+                {
+                    make_hole(item.x, item.y, item.w, item.h, arr);
+                }
+
+                f2.Form2_draw(r, arr, stash);
+            } else
             {
-                if (Items.y_chest.Count > 0)
-                {
-                    x = Items.y_chest.First().get_x();
-                    y = Items.y_chest.First().get_y();
-                    w = Items.y_chest.First().get_w();
-                    h = Items.y_chest.First().get_h();
-                    Items.y_chest.RemoveAt(0);
-                    did = true;
-                }
-                else if (Items.n_chest.Count > 0)
-                {
-                    x = Items.n_chest.First().get_x();
-                    y = Items.n_chest.First().get_y();
-                    w = Items.n_chest.First().get_w();
-                    h = Items.n_chest.First().get_h();
-                    Items.n_chest.RemoveAt(0);
-                }
+                bool[] arr = new bool[576];
+
+                Rectangle r = new Rectangle(left, top, right - left, bottom - top);
+
+                f2.Bounds = r;
+                f2.TopMost = true;
+                f2.Location = new Point(left, top);
+
+                f2.Form2_draw(r, arr, stash);
             }
-            make_hole(x, y, w, h);
-            return did;
+            
+            f2.Show();
+
+            Trace.WriteLine("ShowItemSet Done");
         }
 
-        public bool pop_gloves(bool did)
-        {
-            int x = 0;
-            int y = 0;
-            int w = 0;
-            int h = 0;
-            if (did)
-            {
-                if (Items.n_gloves.Count > 0)
-                {
-                    x = Items.n_gloves.First().get_x();
-                    y = Items.n_gloves.First().get_y();
-                    w = Items.n_gloves.First().get_w();
-                    h = Items.n_gloves.First().get_h();
-                    Items.n_gloves.RemoveAt(0);
-                }
-                else if (Items.y_gloves.Count > 0)
-                {
-                    x = Items.y_gloves.First().get_x();
-                    y = Items.y_gloves.First().get_y();
-                    w = Items.y_gloves.First().get_w();
-                    h = Items.y_gloves.First().get_h();
-                    Items.y_gloves.RemoveAt(0);
-                }
-            }
-            else
-            {
-                if (Items.y_gloves.Count > 0)
-                {
-                    x = Items.y_gloves.First().get_x();
-                    y = Items.y_gloves.First().get_y();
-                    w = Items.y_gloves.First().get_w();
-                    h = Items.y_gloves.First().get_h();
-                    Items.y_gloves.RemoveAt(0);
-                    did = true;
-                }
-                else if (Items.n_gloves.Count > 0)
-                {
-                    x = Items.n_gloves.First().get_x();
-                    y = Items.n_gloves.First().get_y();
-                    w = Items.n_gloves.First().get_w();
-                    h = Items.n_gloves.First().get_h();
-                    Items.n_gloves.RemoveAt(0);
-                }
-            }
-            make_hole(x, y, w, h);
-            return did;
-        }
-
-        public bool pop_helmet(bool did)
-        {
-            int x = 0;
-            int y = 0;
-            int w = 0;
-            int h = 0;
-            if (did)
-            {
-                if (Items.n_helmet.Count > 0)
-                {
-                    x = Items.n_helmet.First().get_x();
-                    y = Items.n_helmet.First().get_y();
-                    w = Items.n_helmet.First().get_w();
-                    h = Items.n_helmet.First().get_h();
-                    Items.n_helmet.RemoveAt(0);
-                }
-                else if (Items.y_helmet.Count > 0)
-                {
-                    x = Items.y_helmet.First().get_x();
-                    y = Items.y_helmet.First().get_y();
-                    w = Items.y_helmet.First().get_w();
-                    h = Items.y_helmet.First().get_h();
-                    Items.y_helmet.RemoveAt(0);
-                }
-            }
-            else
-            {
-                if (Items.y_helmet.Count > 0)
-                {
-                    x = Items.y_helmet.First().get_x();
-                    y = Items.y_helmet.First().get_y();
-                    w = Items.y_helmet.First().get_w();
-                    h = Items.y_helmet.First().get_h();
-                    Items.y_helmet.RemoveAt(0);
-                    did = true;
-                }
-                else if (Items.n_helmet.Count > 0)
-                {
-                    x = Items.n_helmet.First().get_x();
-                    y = Items.n_helmet.First().get_y();
-                    w = Items.n_helmet.First().get_w();
-                    h = Items.n_helmet.First().get_h();
-                    Items.n_helmet.RemoveAt(0);
-                }
-            }
-            make_hole(x, y, w, h);
-            return did;
-        }
-
-        public bool pop_ring(bool did)
-        {
-            int x = 0;
-            int y = 0;
-            int w = 0;
-            int h = 0;
-            if (did)
-            {
-                if (Items.n_ring.Count > 0)
-                {
-                    x = Items.n_ring.First().get_x();
-                    y = Items.n_ring.First().get_y();
-                    w = Items.n_ring.First().get_w();
-                    h = Items.n_ring.First().get_h();
-                    Items.n_ring.RemoveAt(0);
-                }
-                else if (Items.y_ring.Count > 0)
-                {
-                    x = Items.y_ring.First().get_x();
-                    y = Items.y_ring.First().get_y();
-                    w = Items.y_ring.First().get_w();
-                    h = Items.y_ring.First().get_h();
-                    Items.y_ring.RemoveAt(0);
-                }
-            }
-            else
-            {
-                if (Items.y_ring.Count > 0)
-                {
-                    x = Items.y_ring.First().get_x();
-                    y = Items.y_ring.First().get_y();
-                    w = Items.y_ring.First().get_w();
-                    h = Items.y_ring.First().get_h();
-                    Items.y_ring.RemoveAt(0);
-                    did = true;
-                }
-                else if (Items.n_ring.Count > 0)
-                {
-                    x = Items.n_ring.First().get_x();
-                    y = Items.n_ring.First().get_y();
-                    w = Items.n_ring.First().get_w();
-                    h = Items.n_ring.First().get_h();
-                    Items.n_ring.RemoveAt(0);
-                }
-            }
-            make_hole(x, y, w, h);
-            return did;
-        }
-
-        public void make_hole(int x, int y, int w, int h)
+        public void make_hole(int x, int y, int w, int h, bool[] arr)
         {
             //Console.WriteLine("{0}, {1}, {2}, {3}", x, y, w, h);
             for (int i = x; i < x + w; i++) 
@@ -914,19 +706,26 @@ namespace WindowsFormsApp1
             return ret_val;
         }
 
-        public void Button1_Click(object sender, EventArgs e)
+        public void Button1_Click(object sender, EventArgs e)       // Load
         {
-            comboBox1.Enabled = false;
             textBox1.Enabled = false;
             textBox2.Enabled = false;
             textBox3.Enabled = false;
+            textBox4.Enabled = false;
             radioButton1.Enabled = false;
             radioButton2.Enabled = false;
+
+            if (ResetItemSet())
+            {
+                SaveAndApply();
+            }
+        }
+
+        private void LoadItems() { 
             string poesessid = textBox3.Text;
             string json = test(poesessid);
             if (json.Length != 0)
             {
-                
                 loaded = 1;
                 Items.y_W1.Clear();
                 Items.y_W2.Clear();
@@ -946,7 +745,7 @@ namespace WindowsFormsApp1
                 Items.n_amulet.Clear();
                 Items.n_ring.Clear();
                 Items.n_belt.Clear();
-                arr = new bool[576];
+                //arr = new bool[576];
                 label6.Text = "Load Success";
                 JObject JS = JObject.Parse(json);
                 Console.WriteLine("=================== start ================");
@@ -1092,43 +891,45 @@ namespace WindowsFormsApp1
                     }
                 }
                 f3.ChangeValues(
-                Items.y_W1.Count * 2 +
-                Items.y_W2.Count,
-                Items.y_helmet.Count,
-                Items.y_chest.Count,
-                Items.y_boots.Count,
-                Items.y_gloves.Count,
-                Items.y_amulet.Count,
-                Items.y_ring.Count,
-                Items.y_belt.Count,
-                Items.n_W1.Count * 2 +
-                Items.n_W2.Count,
-                Items.n_helmet.Count,
-                Items.n_chest.Count,
-                Items.n_boots.Count,
-                Items.n_gloves.Count,
-                Items.n_amulet.Count,
-                Items.n_ring.Count,
-                Items.n_belt.Count
+                    Items.y_W1.Count * 2 +
+                    Items.y_W2.Count,
+                    Items.y_helmet.Count,
+                    Items.y_chest.Count,
+                    Items.y_boots.Count,
+                    Items.y_gloves.Count,
+                    Items.y_amulet.Count,
+                    Items.y_ring.Count,
+                    Items.y_belt.Count,
+                    Items.n_W1.Count * 2 +
+                    Items.n_W2.Count,
+                    Items.n_helmet.Count,
+                    Items.n_chest.Count,
+                    Items.n_boots.Count,
+                    Items.n_gloves.Count,
+                    Items.n_amulet.Count,
+                    Items.n_ring.Count,
+                    Items.n_belt.Count
                 );
-                timer1.Enabled = true;
-                timer1.Start();
+
+                Trace.WriteLine("LoadItems Done");
+                //timer1.Enabled = true;
+                //timer1.Start();
             }
         }
 
-        private void Button2_Click(object sender, EventArgs e)
+        private void Button2_Click(object sender, EventArgs e)      // Init
         {
             loaded = 0;
-            comboBox1.Enabled = true;
             textBox1.Enabled = true;
             textBox2.Enabled = true;
             textBox3.Enabled = true;
+            textBox4.Enabled = true;
             radioButton1.Enabled = true;
             radioButton2.Enabled = true;
-            comboBox1.SelectedIndex = 0;
             textBox1.Text = "";
             textBox2.Text = "0";
             textBox3.Text = "0";
+            textBox4.Text = "0";
 
             left = 15;
             top = 160;
@@ -1138,8 +939,7 @@ namespace WindowsFormsApp1
             f2.Hide();
 
             stash = 2;
-
-            comboBox1.SelectedIndex = 0;
+            
 
             comboBox2.SelectedIndex = 2;
             comboBox3.SelectedIndex = 2;
@@ -1147,6 +947,7 @@ namespace WindowsFormsApp1
             comboBox5.SelectedIndex = 2;
             comboBox6.SelectedIndex = 2;
             comboBox7.SelectedIndex = 2;
+            comboBox1.SelectedIndex = 2;
 
             comboBox8.SelectedIndex = 8;
             comboBox9.SelectedIndex = 9;
@@ -1154,12 +955,13 @@ namespace WindowsFormsApp1
             comboBox11.SelectedIndex = 11;
             comboBox12.SelectedIndex = 6;
             comboBox13.SelectedIndex = 7;
+            comboBox14.SelectedIndex = 5;
 
             label6.Text = "Need to Load";
             radioButton1.Checked = true;
             radioButton2.Checked = false;
-            timer1.Enabled = false;
-            timer1.Stop();
+            //timer1.Enabled = false;
+            //timer1.Stop();
             Items.y_W1.Clear();
             Items.y_W2.Clear();
             Items.y_helmet.Clear();
@@ -1212,8 +1014,8 @@ namespace WindowsFormsApp1
                 textBox1.Text = lines[0];
                 textBox2.Text = lines[1];
                 textBox3.Text = lines[2];
+                textBox4.Text = lines[3];
 
-                comboBox1.SelectedIndex = Convert.ToInt32(lines[3]);
                 comboBox2.SelectedIndex = Convert.ToInt32(lines[4]);
                 comboBox3.SelectedIndex = Convert.ToInt32(lines[5]);
                 comboBox4.SelectedIndex = Convert.ToInt32(lines[6]);
@@ -1246,6 +1048,11 @@ namespace WindowsFormsApp1
                 checkBox1.Checked = Convert.ToBoolean(lines[22]);
                 label1.Text = "(" + left + ", " + top + ")";
                 label2.Text = "(" + right + ", " + bottom + ")";
+
+                if (lines.Length > 23)
+                    comboBox1.SelectedIndex = Convert.ToInt32(lines[23]);
+                if (lines.Length > 24)
+                    comboBox14.SelectedIndex = Convert.ToInt32(lines[24]);
             }
         }
 
@@ -1259,12 +1066,17 @@ namespace WindowsFormsApp1
 
         }
 
-        private void Timer1_Tick(object sender, EventArgs e)
+        //private void Timer1_Tick(object sender, EventArgs e)
+        //{
+        //    Button1_Click(null, null);
+        //}
+
+        private void Button3_Click(object sender, EventArgs e)      // Save and Apply button event
         {
-            Button1_Click(null, null);
+            SaveAndApply();
         }
 
-        private void Button3_Click(object sender, EventArgs e)
+        private void SaveAndApply()      // Save and Apply
         {
             UnregisterHotKey((int)this.Handle, 0); //이 폼에 ID가 0인 핫키 해제
             UnregisterHotKey((int)this.Handle, 1);
@@ -1272,6 +1084,7 @@ namespace WindowsFormsApp1
             UnregisterHotKey((int)this.Handle, 3);
             UnregisterHotKey((int)this.Handle, 4);
             UnregisterHotKey((int)this.Handle, 5);
+            UnregisterHotKey((int)this.Handle, 6);
 
             RegisterHotKey((int)this.Handle, 0, comboBox2.SelectedIndex, comboBox8.SelectedIndex + (comboBox8.SelectedIndex<12 ? 112 : (comboBox8.SelectedIndex>21?43:36)));
             RegisterHotKey((int)this.Handle, 1, comboBox3.SelectedIndex, comboBox9.SelectedIndex + (comboBox9.SelectedIndex < 12 ? 112 : (comboBox9.SelectedIndex > 21 ? 43 : 36)));
@@ -1279,13 +1092,14 @@ namespace WindowsFormsApp1
             RegisterHotKey((int)this.Handle, 3, comboBox5.SelectedIndex, comboBox11.SelectedIndex + (comboBox11.SelectedIndex < 12 ? 112 : (comboBox11.SelectedIndex > 21 ? 43 : 36)));
             RegisterHotKey((int)this.Handle, 4, comboBox6.SelectedIndex, comboBox12.SelectedIndex + (comboBox12.SelectedIndex < 12 ? 112 : (comboBox12.SelectedIndex > 21 ? 43 : 36)));
             RegisterHotKey((int)this.Handle, 5, comboBox7.SelectedIndex, comboBox13.SelectedIndex + (comboBox13.SelectedIndex < 12 ? 112 : (comboBox13.SelectedIndex > 21 ? 43 : 36)));
+            RegisterHotKey((int)this.Handle, 6, comboBox1.SelectedIndex, comboBox14.SelectedIndex + (comboBox14.SelectedIndex < 12 ? 112 : (comboBox14.SelectedIndex > 21 ? 43 : 36)));
 
             using (StreamWriter ini = new StreamWriter(@".\myConfig.ini"))
             {
                 ini.WriteLine(textBox1.Text.Replace("\\p{Z}", ""));
                 ini.WriteLine(textBox2.Text.Replace("\\p{Z}", ""));
                 ini.WriteLine(textBox3.Text.Replace("\\p{Z}", ""));
-                ini.WriteLine(comboBox1.SelectedIndex.ToString());
+                ini.WriteLine(textBox4.Text.Replace("\\p{Z}", ""));
                 ini.WriteLine(comboBox2.SelectedIndex.ToString());
                 ini.WriteLine(comboBox3.SelectedIndex.ToString());
                 ini.WriteLine(comboBox4.SelectedIndex.ToString());
@@ -1305,8 +1119,30 @@ namespace WindowsFormsApp1
                 ini.WriteLine(stash.ToString());
                 ini.WriteLine(trackBar1.Value.ToString());
                 ini.WriteLine(checkBox1.Checked.ToString());
+                ini.WriteLine(comboBox1.SelectedIndex.ToString());
+                ini.WriteLine(comboBox14.SelectedIndex.ToString());
             }
-            MessageBox.Show("Settings Saved\n설정값이 저장되었습니다");
+
+            ShowSaveMessage();
+        }
+
+        private async void ShowSaveMessage()
+        {
+            int alpha = 255;
+            label22.BackColor = Color.FromArgb(alpha, Color.Black);
+
+            label22.Visible = true;
+
+            await System.Threading.Tasks.Task.Delay(2000);
+
+            while (alpha > 0)
+            {
+                await System.Threading.Tasks.Task.Delay(1);
+                alpha = Math.Max(alpha - 10, 0);
+                label22.BackColor = Color.FromArgb(alpha, Color.Black);
+            }
+
+            label22.Visible = false;
         }
 
         private void TrackBar1_Scroll(object sender, EventArgs e)
@@ -1315,6 +1151,8 @@ namespace WindowsFormsApp1
             SetLayeredWindowAttributes(f3.Handle, 0, (Byte)value, LWA_ALPHA);
         }
     }
+
+
 
     public class WebClientEx : WebClient
     {
@@ -1371,6 +1209,8 @@ namespace WindowsFormsApp1
         public static List<Item> n_amulet;
         public static List<Item> n_ring;
         public static List<Item> n_belt;
+
+        public static List<List<Item>> itemSetList = new List<List<Item>>();
     }
 }
 

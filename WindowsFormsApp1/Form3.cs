@@ -92,6 +92,9 @@ namespace WindowsFormsApp1
                 pictureBox2.Visible = true;
                 timer1.Start();
             }
+            //if (chaos != min_chaos) {
+            //    currentIndex = 0;
+            //}
             chaos = min_chaos;
         }
 
