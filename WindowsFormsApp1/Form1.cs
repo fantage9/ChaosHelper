@@ -9,6 +9,7 @@ using System.Windows.Forms;
 using System.Runtime.InteropServices;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace WindowsFormsApp1
 {
@@ -50,22 +51,82 @@ namespace WindowsFormsApp1
             Cookie c = new Cookie("POESESSID", POECookie, "/", ".pathofexile.com");
             cookies.Add(c);
 
+            string accountUrl = "https://www.pathofexile.com/my-account";
+            try
+            {
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(accountUrl);
+                request.CookieContainer = cookies;
+                request.AllowAutoRedirect = false;
+
+                Trace.WriteLine(" ### Login : " + request.RequestUri);
+
+                WebResponse response = request.GetResponse();
+
+                using (Stream responseStream = response.GetResponseStream())
+                {
+                    StreamReader reader = new StreamReader(responseStream, Encoding.UTF8);
+                    string resultString = reader.ReadToEnd();
+                    Trace.WriteLine(" ### Login Response : " + resultString);
+                }
+            }
+            catch (Exception e)
+            {
+                Trace.WriteLine(" ### Login Error : " + e);
+                MessageBox.Show("로그인에 실패하였습니다.\n" + e);
+                throw e;
+            }
+
+            string accountName = "";
+
+            try
+            {
+                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(accountUrl);
+                request.CookieContainer = cookies;
+
+                Trace.WriteLine(" ### GetAccountName : " + request.RequestUri);
+
+                WebResponse response = request.GetResponse();
+
+                using (Stream responseStream = response.GetResponseStream())
+                {
+                    StreamReader reader = new StreamReader(responseStream, Encoding.UTF8);
+                    string resultString = reader.ReadToEnd();
+                    Trace.WriteLine(" ### GetAccountName Response : " + resultString);
+                    //string regExp = "\\/account\\/view-profile\\/(.*?)\\"";
+                    string pattern = "\\/account\\/view-profile\\/(.*?)\"";
+
+                    var matchResult = Regex.Match(resultString, pattern);
+                    if (matchResult.Groups.Count < 2)
+                    {
+                        throw new Exception("matchResult length error");
+                    }
+
+                    accountName = System.Web.HttpUtility.UrlDecode(matchResult.Groups[1].Value);
+
+                    Trace.WriteLine("accountName  : " + accountName);
+                }
+            }
+            catch (Exception e)
+            {
+                Trace.WriteLine(" ### GetAccountName Error : " + e);
+                MessageBox.Show("계정명을 불러오는데 실패하였습니다.\n" + e);
+                throw e;
+            }
+
             textBox1.Text = textBox1.Text.Replace(" ", "");
             textBox2.Text = textBox2.Text.Replace(" ", "");
             textBox3.Text = textBox3.Text.Replace(" ", "");
-            string accountName = System.Web.HttpUtility.UrlEncode(textBox1.Text);
+            //string accountName = System.Web.HttpUtility.UrlEncode(textBox1.Text);
 
             string tabidx = textBox2.Text.Replace(" ", "");
             string league = textBox4.Text.Replace(" ", "");
             string url = "https://www.pathofexile.com/character-window/get-stash-items?league=" + league + "&tabs=0&tabIndex=" + tabidx + "&accountName=" + accountName;
 
-            Trace.WriteLine(" ### url : " + url);
-            
             try
             {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
                 request.CookieContainer = cookies;
-                Trace.WriteLine(" ### request.RequestUri : " + request.RequestUri);
+                Trace.WriteLine(" ### GetStashes : " + request.RequestUri);
 
                 WebResponse response = request.GetResponse();
 
@@ -73,14 +134,14 @@ namespace WindowsFormsApp1
                 {
                     StreamReader reader = new StreamReader(responseStream, Encoding.UTF8);
                     string resultString = reader.ReadToEnd();
-                    Trace.WriteLine(" ### Response : " + resultString);
+                    Trace.WriteLine(" ### GetStashes Response : " + resultString);
                     return resultString;
                 }
             }
             catch (Exception e)
             {
                 Trace.WriteLine(" ### ERROR : " + e);
-                MessageBox.Show("계정을 불러오는데 문제가 있습니다. Somthing wrong with load account.\n" + e);
+                MessageBox.Show("창고를 불러오는데 실패하였습니다.\n" + e);
                 throw e;
             }
         }
@@ -708,7 +769,7 @@ namespace WindowsFormsApp1
 
         public void Button1_Click(object sender, EventArgs e)       // Load
         {
-            textBox1.Enabled = false;
+            //textBox1.Enabled = false;
             textBox2.Enabled = false;
             textBox3.Enabled = false;
             textBox4.Enabled = false;
@@ -920,7 +981,7 @@ namespace WindowsFormsApp1
         private void Button2_Click(object sender, EventArgs e)      // Init
         {
             loaded = 0;
-            textBox1.Enabled = true;
+            //textBox1.Enabled = true;
             textBox2.Enabled = true;
             textBox3.Enabled = true;
             textBox4.Enabled = true;

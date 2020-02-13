@@ -270,12 +270,14 @@
             // 
             // textBox1
             // 
+            this.textBox1.Enabled = false;
             this.textBox1.Location = new System.Drawing.Point(9, 42);
             this.textBox1.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.textBox1.Name = "textBox1";
             this.textBox1.Size = new System.Drawing.Size(266, 25);
             this.textBox1.TabIndex = 1;
             this.textBox1.Text = "에스크로";
+            this.textBox1.Visible = false;
             // 
             // label3
             // 
@@ -285,6 +287,7 @@
             this.label3.Size = new System.Drawing.Size(159, 15);
             this.label3.TabIndex = 0;
             this.label3.Text = "Account Name(계정명)";
+            this.label3.Visible = false;
             // 
             // trackBar1
             // 
